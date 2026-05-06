@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import unicodedata
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -37,7 +38,11 @@ _lock = asyncio.Lock()
 
 async def _run_in_background(phase: str, brand_name: str | None = None):
     """Run discovery and/or price-check, optionally filtered to a single brand."""
-    job_key = f"{brand_name.lower()}_pipeline" if brand_name else "full_pipeline"
+    def _ascii_key(s: str) -> str:
+        nfkd = unicodedata.normalize("NFKD", s)
+        return "".join(c for c in nfkd if not unicodedata.combining(c)).lower()
+
+    job_key = f"{_ascii_key(brand_name)}_pipeline" if brand_name else "full_pipeline"
     async with _lock:
         db.update_scraping_config_run(job_key, "running")
         result = {}

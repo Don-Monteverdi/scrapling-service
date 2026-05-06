@@ -18,7 +18,7 @@ def _rest(path: str) -> str:
 
 
 def get_brands() -> list[dict]:
-    r = httpx.get(_rest("admin_brands?select=id,name,discovery_url&is_active=eq.true"), headers=_HEADERS, timeout=15)
+    r = httpx.get(_rest("admin_brands?select=id,name,discovery_url"), headers=_HEADERS, timeout=15)
     r.raise_for_status()
     return r.json()
 
