@@ -166,3 +166,9 @@ def get_scraping_config() -> dict | None:
     r.raise_for_status()
     rows = r.json()
     return rows[0] if rows else None
+
+
+def get_all_scraping_configs() -> list[dict]:
+    r = httpx.get(_rest("scraping_config?select=*&order=job_name"), headers=_HEADERS, timeout=15)
+    r.raise_for_status()
+    return r.json()

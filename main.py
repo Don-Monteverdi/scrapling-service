@@ -25,7 +25,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 def _require_auth(credentials: HTTPAuthorizationCredentials | None) -> None:
     if not SCRAPLING_SERVICE_SECRET:
-        return  # secret not configured — open (dev only)
+        return
     if not credentials or credentials.credentials != SCRAPLING_SERVICE_SECRET:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
@@ -35,13 +35,17 @@ def _require_auth(credentials: HTTPAuthorizationCredentials | None) -> None:
 _lock = asyncio.Lock()
 
 
-async def _run_in_background(phase: str):
+async def _run_in_background(phase: str, brand_name: str | None = None):
+    """Run discovery and/or price-check, optionally filtered to a single brand."""
+    job_key = f"{brand_name.lower()}_pipeline" if brand_name else "full_pipeline"
     async with _lock:
-        db.update_scraping_config_run("full_pipeline", "running")
+        db.update_scraping_config_run(job_key, "running")
         result = {}
         try:
             if phase in ("full", "discovery"):
                 brands = db.get_brands()
+                if brand_name:
+                    brands = [b for b in brands if b["name"].lower() == brand_name.lower()]
                 new_models = 0
                 for brand in brands:
                     if not brand.get("discovery_url"):
@@ -58,25 +62,25 @@ async def _run_in_background(phase: str):
                 result["new_models"] = new_models
 
             if phase in ("full", "price-check"):
-                pc_result = await asyncio.to_thread(price_check.run_price_check)
+                pc_result = await asyncio.to_thread(price_check.run_price_check, brand_name)
                 result.update(pc_result)
 
-            db.update_scraping_config_run("full_pipeline", "ok", result)
-            logger.info(f"Phase '{phase}' complete: {result}")
+            db.update_scraping_config_run(job_key, "ok", result)
+            logger.info(f"Phase '{phase}' brand='{brand_name}' complete: {result}")
         except Exception as e:
-            logger.error(f"Phase '{phase}' error: {e}")
-            db.update_scraping_config_run("full_pipeline", "error", {"error": str(e)})
+            logger.error(f"Phase '{phase}' brand='{brand_name}' error: {e}")
+            db.update_scraping_config_run(job_key, "error", {"error": str(e)})
 
 
-def _sync_run_full():
-    asyncio.run(_run_in_background("full"))
+def _sync_run_brand(brand_name: str | None = None):
+    asyncio.run(_run_in_background("full", brand_name))
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler.init(_sync_run_full)
+    scheduler.init(_sync_run_brand)
     yield
     scheduler.shutdown()
 
@@ -95,21 +99,28 @@ def health():
 async def run_full(credentials: HTTPAuthorizationCredentials | None = Security(_bearer)):
     _require_auth(credentials)
     asyncio.create_task(_run_in_background("full"))
-    return {"ok": True, "message": "Full pipeline started"}
+    return {"ok": True, "message": "Full pipeline started (all brands)"}
+
+
+@app.post("/run/brand/{brand_name}")
+async def run_brand(brand_name: str, credentials: HTTPAuthorizationCredentials | None = Security(_bearer)):
+    _require_auth(credentials)
+    asyncio.create_task(_run_in_background("full", brand_name))
+    return {"ok": True, "message": f"Full pipeline started for brand: {brand_name}"}
 
 
 @app.post("/run/discovery")
 async def run_discovery(credentials: HTTPAuthorizationCredentials | None = Security(_bearer)):
     _require_auth(credentials)
     asyncio.create_task(_run_in_background("discovery"))
-    return {"ok": True, "message": "Discovery phase started"}
+    return {"ok": True, "message": "Discovery phase started (all brands)"}
 
 
 @app.post("/run/price-check")
 async def run_price_check_endpoint(credentials: HTTPAuthorizationCredentials | None = Security(_bearer)):
     _require_auth(credentials)
     asyncio.create_task(_run_in_background("price-check"))
-    return {"ok": True, "message": "Price check started"}
+    return {"ok": True, "message": "Price check started (all brands)"}
 
 
 @app.post("/reload-config")

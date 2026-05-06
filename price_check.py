@@ -241,11 +241,14 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
     }
 
 
-def run_price_check() -> dict:
+def run_price_check(brand_name: str | None = None) -> dict:
     """
     Phase 2: iterate all active model_price_urls, check for changes, update DB.
+    Optionally filtered to a single brand.
     """
     urls = db.get_all_active_urls()
+    if brand_name:
+        urls = [u for u in urls if u.get("brand_name", "").lower() == brand_name.lower()]
     print(f"Price check: {len(urls)} URLs")
 
     brands_r = httpx.get(
