@@ -90,7 +90,7 @@ def upsert_admin_model(brand_id: str, name: str, base_price: int, description: s
         "engine_options": engine_options or [],
         "price_pdf_url": price_pdf_url,
     }
-    r = httpx.post(_rest("admin_models"), headers={**_HEADERS, "Prefer": "return=representation,resolution=merge-duplicates"}, json=payload, timeout=15)
+    r = httpx.post(_rest("admin_models"), headers=_HEADERS, json=payload, timeout=15)
     r.raise_for_status()
     rows = r.json()
     return rows[0] if rows else payload

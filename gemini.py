@@ -141,7 +141,7 @@ def call_gemini_pdf_native(pdf_base64: str, brand_name: str, model_label: str) -
             ]}],
             "generationConfig": {"maxOutputTokens": 65536, "temperature": 0.1},
         },
-        timeout=120,
+        timeout=300,
     ))
     data = resp.json()
     return data["candidates"][0]["content"]["parts"][0]["text"]
