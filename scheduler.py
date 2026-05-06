@@ -19,9 +19,13 @@ def init(run_full):
     global _run_full_fn
     _run_full_fn = run_full
 
-    config = db.get_scraping_config()
     cron_expr = "0 4 * * *"
     is_active = True
+    try:
+        config = db.get_scraping_config()
+    except Exception as e:
+        logger.warning(f"Could not load scraping config from DB (using defaults): {e}")
+        config = None
     if config:
         cron_expr = config.get("cron_expression", cron_expr)
         is_active = config.get("is_active", True)
