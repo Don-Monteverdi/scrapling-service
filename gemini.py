@@ -4,7 +4,7 @@ import time
 import httpx
 
 GOOGLE_AI_API_KEY = os.environ["GOOGLE_AI_API_KEY"]
-_MODEL = "gemini-3.1-flash"
+_MODEL = "gemini-2.5-flash"
 _GENERATE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{_MODEL}:generateContent?key={GOOGLE_AI_API_KEY}"
 _OPENAI_URL = f"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?key={GOOGLE_AI_API_KEY}"
 
