@@ -1,0 +1,6 @@
+scrapling[fetchers]
+fastapi
+uvicorn[standard]
+httpx
+apscheduler
+python-dotenv
