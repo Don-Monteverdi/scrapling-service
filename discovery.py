@@ -7,6 +7,8 @@ import gemini as gem
 
 _ARLISTA_PATTERN = re.compile(r"arlista|price|pricelist", re.IGNORECASE)
 _PDF_PATTERN = re.compile(r"\.pdf$", re.IGNORECASE)
+# Exclude non-HU language CDN paths (NL, DE, FR, etc.)
+_EXCLUDE_PATTERN = re.compile(r"/[A-Z]{2}-pricelists/|/[a-z]{2}-[A-Z]{2}/|Prijslijst|Preisliste|Tarif", re.IGNORECASE)
 _OPENDATALOADER_URL = None
 _OPENDATALOADER_SECRET = None
 
@@ -55,7 +57,7 @@ def _find_pdf_links_on_page(page) -> list[dict]:
         href = a.attrib.get("href", "")
         if not href:
             continue
-        if _PDF_PATTERN.search(href) and _ARLISTA_PATTERN.search(href):
+        if _PDF_PATTERN.search(href) and _ARLISTA_PATTERN.search(href) and not _EXCLUDE_PATTERN.search(href):
             text = a.text or ""
             if href.startswith("/"):
                 # Relative URL — we can't resolve without base, keep as-is for now
