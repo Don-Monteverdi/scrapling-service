@@ -42,7 +42,7 @@ def _convert_pdf_to_markdown(pdf_bytes: bytes) -> str | None:
 
 def _fetch_pdf_bytes(url: str) -> bytes | None:
     try:
-        r = httpx.get(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/pdf"}, follow_redirects=True, timeout=60)
+        r = httpx.get(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/pdf"}, follow_redirects=True, timeout=120)
         r.raise_for_status()
         return r.content
     except Exception as e:

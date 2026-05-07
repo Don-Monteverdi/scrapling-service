@@ -90,7 +90,7 @@ def upsert_admin_model(brand_id: str, name: str, base_price: int, description: s
         "engine_options": engine_options or [],
         "price_pdf_url": price_pdf_url or "",
     }
-    r = httpx.post(_rest("admin_models"), headers=_HEADERS, json=payload, timeout=15)
+    r = httpx.post(_rest("admin_models"), headers={**_HEADERS, "Prefer": "return=representation,resolution=merge-duplicates"}, json=payload, timeout=15)
     if not r.is_success:
         print(f"upsert_admin_model error {r.status_code}: {r.text[:500]}")
     r.raise_for_status()

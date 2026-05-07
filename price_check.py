@@ -26,7 +26,7 @@ def _convert_pdf_to_markdown(pdf_bytes: bytes) -> str | None:
             f"{OPENDATALOADER_URL}/convert",
             headers={"Authorization": f"Bearer {OPENDATALOADER_SECRET}", "Content-Type": "application/json"},
             json={"pdf_base64": pdf_b64},
-            timeout=60,
+            timeout=120,
         )
         if not r.is_success:
             print(f"opendataloader {r.status_code} — falling back to native PDF")
@@ -97,7 +97,15 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
             if brand_id:
                 existing_model = db.get_admin_model_by_name(brand_id, model_name)
 
-            model_base_price = int(model_data.get("base_price") or 0)
+            model_base_price = model_data.get("base_price")
+            if not model_base_price:
+                _ep_prices = [
+                    ep.get("list_price") or ep.get("price")
+                    for ep in model_data.get("engine_prices", [])
+                    if ep.get("list_price") or ep.get("price")
+                ]
+                model_base_price = min(_ep_prices) if _ep_prices else 0
+            model_base_price = int(model_base_price or 0)
             if existing_model:
                 old_price_int = int(existing_model.get("base_price") or 0)
                 new_price = model_base_price or old_price_int
@@ -166,6 +174,7 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                     "brand_name": brand_name,
                     "model_name": model_name,
                     "variant_name": variant_name,
+                    "model_id": model_id if model_id else None,
                     "trim_levels": trim_summary,
                     "source_url": url_record.get("url", ""),
                     "source_name": f"PDF árlista – {brand_name}",
@@ -275,7 +284,7 @@ def run_price_check(brand_name: str | None = None) -> dict:
                 url_record["url"],
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "hu-HU,hu;q=0.9"},
                 follow_redirects=True,
-                timeout=60,
+                timeout=120,
             )
             if not r.is_success:
                 errors.append({"model_label": url_record["model_label"], "error": f"HTTP {r.status_code}"})
