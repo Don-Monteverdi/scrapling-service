@@ -97,9 +97,10 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
             if brand_id:
                 existing_model = db.get_admin_model_by_name(brand_id, model_name)
 
+            model_base_price = int(model_data.get("base_price") or 0)
             if existing_model:
-                raw_price = model_data.get("base_price") or existing_model.get("base_price")
-                new_price = int(raw_price) if raw_price is not None else 0
+                old_price_int = int(existing_model.get("base_price") or 0)
+                new_price = model_base_price or old_price_int
                 update_payload: dict = {"base_price": new_price}
                 if model_data.get("description"):
                     update_payload["description"] = model_data["description"]
@@ -111,15 +112,15 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                     update_payload["price_pdf_url"] = price_pdf_url
                 db.update_admin_model(existing_model["id"], update_payload)
                 model_id = existing_model["id"]
-                if existing_model.get("base_price") != new_price:
-                    details.append(f"📊 {model_name}: {existing_model.get('base_price'):,} → {new_price:,} Ft")
+                if old_price_int != new_price:
+                    details.append(f"📊 {model_name}: {old_price_int:,} → {new_price:,} Ft")
                 else:
                     details.append(f"✅ {model_name}: adatok frissítve")
             else:
                 if brand_id:
                     new_model = db.upsert_admin_model(
                         brand_id, model_name,
-                        int(model_data.get("base_price") or 0),
+                        model_base_price,
                         model_data.get("description", ""),
                         model_data.get("category", "személygépjármű"),
                         model_data.get("engine_options", []),
@@ -128,7 +129,7 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                     model_id = new_model.get("id", "")
                 else:
                     model_id = ""
-                details.append(f"🆕 {model_name}: új modell ({model_data.get('base_price', 0):,} Ft)")
+                details.append(f"🆕 {model_name}: új modell ({model_base_price:,} Ft)")
             models_updated += 1
 
             # ── admin_pricing_configs ──
@@ -189,7 +190,7 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                             "old_value": str(old_price or ""), "new_value": str(new_price),
                             "source_url_id": url_record.get("id"),
                         })
-                        details.append(f"💰 {variant_name}: {old_price:,} → {new_price:,} Ft")
+                        details.append(f"💰 {variant_name}: {int(old_price or 0):,} → {int(new_price or 0):,} Ft")
                         changes_logged += 1
                 else:
                     db.upsert_model_spec(spec_payload)
@@ -216,15 +217,15 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                 "brand_id": brand_id,
                 "name": promo["name"],
                 "model_name": promo.get("model_name", ""),
-                "discount_type": promo.get("discount_type", "amount"),
-                "discount_value": promo.get("discount_value", 0),
-                "valid_from": promo.get("valid_from"),
-                "valid_until": promo.get("valid_until"),
-                "customer_type": promo.get("customer_type", "mindketto"),
+                "discount_type": promo.get("discount_type", "amount") or "amount",
+                "discount_value": int(promo.get("discount_value") or 0),
+                "valid_from": promo.get("valid_from") or None,
+                "valid_until": promo.get("valid_until") or None,
+                "customer_type": promo.get("customer_type", "mindketto") or "mindketto",
                 "description": promo.get("description", ""),
                 "is_active": True,
                 "source": "pdf",
-                "modell_id": promo.get("modell_id", ""),
+                "modell_id": promo.get("modell_id", "") or "",
             })
             promos_written += 1
         except Exception as e:
