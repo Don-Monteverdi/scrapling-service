@@ -84,40 +84,54 @@ def upsert_admin_model(brand_id: str, name: str, base_price: int, description: s
     payload = {
         "brand_id": brand_id,
         "name": name,
-        "base_price": base_price,
-        "description": description,
-        "category": category,
+        "base_price": int(base_price) if base_price is not None else 0,
+        "description": description or "",
+        "category": category or "személygépjármű",
         "engine_options": engine_options or [],
-        "price_pdf_url": price_pdf_url,
+        "price_pdf_url": price_pdf_url or "",
     }
     r = httpx.post(_rest("admin_models"), headers=_HEADERS, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"upsert_admin_model error {r.status_code}: {r.text[:500]}")
     r.raise_for_status()
     rows = r.json()
     return rows[0] if rows else payload
 
 
 def update_admin_model(model_id: str, payload: dict) -> None:
+    if "base_price" in payload and payload["base_price"] is not None:
+        payload["base_price"] = int(payload["base_price"])
     r = httpx.patch(_rest(f"admin_models?id=eq.{model_id}"), headers=_HEADERS, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"update_admin_model error {r.status_code}: {r.text[:500]}")
     r.raise_for_status()
 
 
 def upsert_model_spec(payload: dict) -> None:
     r = httpx.post(_rest("admin_model_specs"), headers={**_HEADERS, "Prefer": "return=minimal,resolution=merge-duplicates"}, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"upsert_model_spec error {r.status_code}: {r.text[:500]}")
     r.raise_for_status()
 
 
 def update_model_spec(spec_id: str, payload: dict) -> None:
     r = httpx.patch(_rest(f"admin_model_specs?id=eq.{spec_id}"), headers=_HEADERS, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"update_model_spec error {r.status_code}: {r.text[:500]}")
     r.raise_for_status()
 
 
 def log_price_change(payload: dict) -> None:
     r = httpx.post(_rest("price_change_log"), headers={**_HEADERS, "Prefer": "return=minimal"}, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"log_price_change error {r.status_code}: {r.text[:300]}")
     r.raise_for_status()
 
 
 def upsert_promotion(payload: dict) -> None:
     r = httpx.post(_rest("admin_promotions"), headers={**_HEADERS, "Prefer": "return=minimal,resolution=merge-duplicates"}, json=payload, timeout=15)
+    if not r.is_success:
+        print(f"upsert_promotion error {r.status_code}: {r.text[:300]}")
     r.raise_for_status()
 
 

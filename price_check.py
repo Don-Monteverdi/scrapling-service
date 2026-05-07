@@ -98,7 +98,8 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                 existing_model = db.get_admin_model_by_name(brand_id, model_name)
 
             if existing_model:
-                new_price = model_data.get("base_price") or existing_model.get("base_price")
+                raw_price = model_data.get("base_price") or existing_model.get("base_price")
+                new_price = int(raw_price) if raw_price is not None else 0
                 update_payload: dict = {"base_price": new_price}
                 if model_data.get("description"):
                     update_payload["description"] = model_data["description"]
@@ -118,7 +119,7 @@ def apply_parsed_data(parsed: dict, brand_name: str, brand_id: str | None, price
                 if brand_id:
                     new_model = db.upsert_admin_model(
                         brand_id, model_name,
-                        model_data.get("base_price", 0),
+                        int(model_data.get("base_price") or 0),
                         model_data.get("description", ""),
                         model_data.get("category", "személygépjármű"),
                         model_data.get("engine_options", []),
