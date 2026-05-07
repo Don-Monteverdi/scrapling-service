@@ -356,6 +356,10 @@ def run_price_check(brand_name: str | None = None) -> dict:
             msg = str(e)
             print(f"Error {url_record['model_label']}: {msg}")
             errors.append({"model_label": url_record["model_label"], "error": msg})
+            try:
+                db.update_url_hash(url_record["id"], None, now, last_error=msg[:500])
+            except Exception:
+                pass
             if "429" in msg:
                 break  # quota exhausted
 
