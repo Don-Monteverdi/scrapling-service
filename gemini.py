@@ -6,7 +6,8 @@ import httpx
 GOOGLE_AI_API_KEY = os.environ["GOOGLE_AI_API_KEY"]
 _MODEL = "gemini-2.5-flash"
 _GENERATE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{_MODEL}:generateContent?key={GOOGLE_AI_API_KEY}"
-_OPENAI_URL = f"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions?key={GOOGLE_AI_API_KEY}"
+_OPENAI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+_OPENAI_HEADERS = {"Authorization": f"Bearer {GOOGLE_AI_API_KEY}", "Content-Type": "application/json"}
 
 AI_SYSTEM_PROMPT = """Te egy autóipari árlista PDF elemző vagy. A felhasználó egy gyártói árlistát ad meg PDF vagy HTML formátumban.
 
@@ -113,6 +114,7 @@ def call_gemini_text(content: str, brand_name: str = "", model_label: str = "") 
     user_msg = f"Ez a(z) {brand_name} \"{model_label}\" gyártói árlista tartalma. Elemezd és add meg a strukturált adatokat JSON-ban:\n\n{content}"
     resp = _retry_gemini(lambda: httpx.post(
         _OPENAI_URL,
+        headers=_OPENAI_HEADERS,
         json={
             "model": _MODEL,
             "messages": [
@@ -160,6 +162,7 @@ def call_gemini_model_diff(scraped_models: list[str], db_models: list[str]) -> l
     )
     resp = httpx.post(
         _OPENAI_URL,
+        headers=_OPENAI_HEADERS,
         json={
             "model": _MODEL,
             "messages": [{"role": "user", "content": prompt}],
