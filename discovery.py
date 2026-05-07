@@ -3,6 +3,7 @@ import re
 import time
 import httpx
 import db
+import fetcher as fetch
 import gemini as gem
 
 _ARLISTA_PATTERN = re.compile(r"arlista|price|pricelist", re.IGNORECASE)
@@ -41,13 +42,10 @@ def _convert_pdf_to_markdown(pdf_bytes: bytes) -> str | None:
 
 
 def _fetch_pdf_bytes(url: str) -> bytes | None:
-    try:
-        r = httpx.get(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/pdf"}, follow_redirects=True, timeout=120)
-        r.raise_for_status()
-        return r.content
-    except Exception as e:
-        print(f"PDF download failed {url}: {e}")
-        return None
+    data, error = fetch.fetch_bytes(url)
+    if error:
+        print(f"PDF download failed {url}: {error}")
+    return data
 
 
 def _find_pdf_links_on_page(page) -> list[dict]:

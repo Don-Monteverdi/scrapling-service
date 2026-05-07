@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import httpx
 
 import db
+import fetcher as fetch
 import gemini as gem
 
 OPENDATALOADER_URL = os.environ.get("OPENDATALOADER_URL", "")
@@ -16,56 +17,6 @@ OPENDATALOADER_SECRET = os.environ.get("OPENDATALOADER_SECRET", "")
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-
-def _fetch_bytes_with_browser(url: str) -> bytes | None:
-    """
-    Download a CDN-protected URL (HTTP 403 to plain httpx) using a real browser.
-    Navigates to the brand homepage first to establish session cookies, then
-    fetches the target URL via JS fetch() with credentials included.
-    """
-    import json
-    import urllib.parse
-    from playwright.sync_api import sync_playwright
-
-    parsed = urllib.parse.urlparse(url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}"
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox", "--disable-dev-shm-usage"],
-            )
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
-            page = context.new_page()
-            try:
-                page.goto(base_url, wait_until="domcontentloaded", timeout=30000)
-            except Exception:
-                pass  # homepage load failure is non-fatal — cookies may still be set
-
-            b64_chunks = page.evaluate(f"""
-                async () => {{
-                    const r = await fetch({json.dumps(url)}, {{credentials: 'include'}});
-                    if (!r.ok) return null;
-                    const buf = await r.arrayBuffer();
-                    const bytes = new Uint8Array(buf);
-                    const chunks = [];
-                    for (let i = 0; i < bytes.length; i += 8192) {{
-                        chunks.push(btoa(String.fromCharCode(...bytes.subarray(i, i + 8192))));
-                    }}
-                    return chunks;
-                }}
-            """)
-            browser.close()
-
-            if not b64_chunks:
-                return None
-            return base64.b64decode("".join(b64_chunks))
-    except Exception as e:
-        print(f"Browser fetch failed for {url}: {e}")
-        return None
 
 
 def _convert_pdf_to_markdown(pdf_bytes: bytes) -> str | None:
@@ -331,35 +282,17 @@ def run_price_check(brand_name: str | None = None) -> dict:
             print(f"Checking: {url_record['brand_name']} / {url_record['model_label']}")
             is_pdf = url_record["url"].lower().endswith(".pdf")
 
-            r = httpx.get(
-                url_record["url"],
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "hu-HU,hu;q=0.9"},
-                follow_redirects=True,
-                timeout=120,
-            )
-            if r.status_code == 403:
-                print(f"HTTP 403 — retrying with browser: {url_record['url']}")
-                raw_bytes = _fetch_bytes_with_browser(url_record["url"])
-                if not raw_bytes:
-                    msg = "HTTP 403 (browser fallback also failed)"
-                    errors.append({"model_label": url_record["model_label"], "error": msg})
-                    db.update_url_hash(url_record["id"], None, now, last_error=msg)
-                    continue
-                if is_pdf:
-                    content_bytes = raw_bytes
-                    new_hash = _sha256(content_bytes)
-                else:
-                    html = raw_bytes.decode("utf-8", errors="replace")
-                    new_hash = _sha256(_extract_price_content(html).encode())
-            elif not r.is_success:
-                errors.append({"model_label": url_record["model_label"], "error": f"HTTP {r.status_code}"})
-                db.update_url_hash(url_record["id"], None, now, last_error=f"HTTP {r.status_code}")
+            raw_bytes, fetch_error = fetch.fetch_bytes(url_record["url"])
+            if fetch_error:
+                errors.append({"model_label": url_record["model_label"], "error": fetch_error})
+                db.update_url_hash(url_record["id"], None, now, last_error=fetch_error)
                 continue
-            elif is_pdf:
-                content_bytes = r.content
+
+            if is_pdf:
+                content_bytes = raw_bytes
                 new_hash = _sha256(content_bytes)
             else:
-                html = r.text
+                html = raw_bytes.decode("utf-8", errors="replace")
                 new_hash = _sha256(_extract_price_content(html).encode())
 
             old_hash = url_record.get("content_hash")
